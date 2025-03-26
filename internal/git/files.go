@@ -8,8 +8,9 @@ const (
 	PrefixRef  = "ref: "
 )
 
-func getPathsRef() []string {
+func getPathsCommon() []string {
 	return []string{
+		PathHead,
 		"FETCH_HEAD",
 		"logs/stash",
 		"logs/HEAD",
@@ -25,18 +26,14 @@ func getPathsRef() []string {
 		"refs/heads/origin",
 		"refs/remotes/origin/master",
 		"refs/remotes/origin/main",
-	}
-}
+		"refs/remotes/origin/HEAD",
 
-func getPathsCommon() []string {
-	return []string{
 		"ORIG_HEAD",
 		"application",
 		"description",
 		"COMMIT_EDITMSG",
 		"config",
 		"info/exclude",
-		"refs/remotes/origin/HEAD",
 
 		"hooks/applypatch-msg",
 		"hooks/applypatch-msg.sample",

@@ -84,7 +84,7 @@ func RunIndexDump(app *application.App) (err error) {
 func (idx *Index) getAsTable() (str string) {
 	for _, e := range idx.Index.Entries {
 		size := utils.SizeToHumanReadable(int64(e.Size))
-		str += size + "\t" + e.Name
+		str += size + "\t" + e.Name + "\n"
 	}
 
 	return

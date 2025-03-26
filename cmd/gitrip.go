@@ -40,14 +40,11 @@ func (gr *GitRip) Run() (err error) {
 	switch gr.app.Cfg.Command {
 	case application.CmdCheck:
 		err = gr.runCheck()
-		break
 	case application.CmdFetch:
 		err = gr.runFetch()
-		break
 	case application.CmdIndex:
 		err = git.RunIndexDump(gr.app)
-		break
-	case "":
+	case application.CmdHelp, "":
 		os.Exit(0)
 	default:
 		err = fmt.Errorf("unknown command '%s'", gr.app.Cfg.Command)

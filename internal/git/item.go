@@ -58,11 +58,10 @@ func (it *Item) save() (err error) {
 	return
 }
 
-// TODO fetch will be done from outside, and just populated.
-func (it *Item) fetch(rp *Repo) {
-	urlItem := utils.GetNewSuffixedUrl(rp.Url, it.fileName)
-
-	it.fileData, it.netHttpCode, it.netFetchErr = rp.dumper.fetcher.Fetch(rp.dumper.app.Ctx, urlItem.String())
+func (it *Item) Update(data []byte, code int, err error) {
+	it.fileData = data
+	it.netHttpCode = code
+	it.netFetchErr = err
 	it.fileSize = len(it.fileData)
 	it.exists = it.netFetchErr == nil && it.netHttpCode != http.StatusNotFound
 	it.fileDataStr = *(*string)(unsafe.Pointer(&it.fileData))
@@ -95,6 +94,10 @@ func (it *Item) GetReferences() (hashes []string, err error) {
 	}
 
 	return
+}
+
+func (it *Item) IsValidIndexFile() bool {
+	return len(it.fileData) >= 5 && strings.HasPrefix(string(it.fileData[:5]), "DIRC")
 }
 
 func (it *Item) findHashes() (hashes []string) {

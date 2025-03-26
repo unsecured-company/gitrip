@@ -28,7 +28,7 @@ type Dumper struct {
 	chanSave   chan *Item
 	cntFailed  int
 	cntSuccess int
-	domains    *utils.SafeMapStrings
+	domains    *utils.SafeMapStrings // TODO remove too, it will be chan
 	hashRegexp *regexp.Regexp
 	wgSaver    *sync.WaitGroup
 	wgWorker   sync.WaitGroup
@@ -82,13 +82,8 @@ func (d *Dumper) runForUrl(urlStr string) (err error) {
 		urlP.Scheme = "https"
 	}
 
-	rp, err := NewRepo(d, urlP)
-
-	if err != nil {
-		return
-	}
-
-	err = rp.run()
+	rp := NewRepo(d, urlP)
+	err = rp.Run()
 
 	return
 }

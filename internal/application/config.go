@@ -8,7 +8,8 @@ const (
 	DefaultFetchWorkers   = 4
 	DefaultTimeout        = 10
 	DefaultCntDownThreads = 10
-	LimitHashes           = 20 // Max hashes read from files other than /objects.
+	LimitHashes           = 1000 // Max hashes to read by regex from files other than /objects.
+	DebugPrintEveryFetch  = false
 )
 
 const (
