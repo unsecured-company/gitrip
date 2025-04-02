@@ -87,7 +87,7 @@ func (ch *Checker) processor() {
 
 func (ch *Checker) check(fetcher *network.Fetcher, urlRoot *url.URL) {
 	urlIndex := utils.GetNewSuffixedUrl(urlRoot, PathIndex)
-	data, code, err := fetcher.Fetch(ch.app.Ctx, urlIndex.String())
+	data, code, err := fetcher.Fetch(ch.app.Ctx, urlIndex.String(), 4)
 
 	if err != nil {
 		ch.app.Out.Logf("%s failed, error: %v", urlIndex, err)

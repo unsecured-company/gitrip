@@ -65,7 +65,7 @@ func (d *Dumper) Run() (err error) {
 }
 
 func (d *Dumper) Close() {
-	d.app.Out.Debug("Closing save channel")
+	d.app.Out.Debug("Closing Save channel")
 	close(d.chanSave)
 
 	d.wgSaver.Wait()
@@ -90,7 +90,7 @@ func (d *Dumper) runForUrl(urlStr string) (err error) {
 
 func (d *Dumper) runnerSave() {
 	for it := range d.chanSave {
-		err := it.save()
+		err := it.Save()
 
 		if err != nil {
 			d.app.Out.Logf(LogErrSavingFile, it.fileName, err)

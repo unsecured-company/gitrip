@@ -3,33 +3,49 @@ package network
 import (
 	"context"
 	"crypto/tls"
-	"errors"
+	"github.com/hashicorp/go-retryablehttp"
 	"io"
 	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 	"unsecured.company/gitrip/internal/application"
-	"unsecured.company/gitrip/internal/fs"
 )
-
-const MaxLength = 20 * fs.SizeMB
 
 type Fetcher struct {
 	out       *application.Output
 	timeout   int
 	userAgent string
+	client    *retryablehttp.Client
 }
 
 func NewFetcher(app *application.App) (fetcher *Fetcher) {
+	retryClient := retryablehttp.NewClient()
+	retryClient.RetryMax = application.FetchClientRetryMax
+	retryClient.RetryWaitMin = application.FetchClientRetryWaitMinSec * time.Second
+	retryClient.RetryWaitMax = application.FetchClientRetryWaitMaxSec * time.Second
+	retryClient.CheckRetry = retryablehttp.DefaultRetryPolicy
+	retryClient.Backoff = retryablehttp.DefaultBackoff
+	retryClient.Logger = nil
+
+	retryClient.HTTPClient.Transport = &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+		},
+		MaxIdleConns:        application.FetchClientMaxIdleCnt,
+		MaxIdleConnsPerHost: application.FetchClientMaxConnPerHost,
+		IdleConnTimeout:     application.FetchClientIdleConnTimeoutSec * time.Second,
+	}
+
 	fetcher = &Fetcher{
 		timeout: app.Cfg.Timeout,
 		out:     app.Out,
+		client:  retryClient,
 	}
 
 	fetcher.userAgent = app.Cfg.UserAgent
-
 	if fetcher.userAgent == "" {
 		fetcher.userAgent = GetRandomUserAgent()
 	}
@@ -37,8 +53,34 @@ func NewFetcher(app *application.App) (fetcher *Fetcher) {
 	return
 }
 
-func (f *Fetcher) Fetch(ctx context.Context, urlStr string) (content []byte, code int, err error) {
-	return f.fetchCommon(ctx, urlStr, "")
+func (f *Fetcher) Fetch(ctx context.Context, urlStr string, retryTimes int) (content []byte, code int, err error) {
+	for attempt := 0; attempt < retryTimes; attempt++ {
+		// Reset context to ensure a fresh context for each attempt
+		attemptCtx, cancel := context.WithTimeout(ctx, time.Duration(f.timeout)*time.Second)
+		defer cancel()
+
+		content, code, err = f.fetchCommon(attemptCtx, urlStr, "")
+
+		if err == nil {
+			return
+		}
+
+		switch {
+		case f.isErrNoHost(err):
+			f.out.Logf("(%s) No route to host, retry attempt %d", urlStr, attempt+1)
+		case f.isConnectionError(err):
+			f.out.Logf("(%s) Connection error, retry attempt %d", urlStr, attempt+1)
+		case f.isTimeoutError(err):
+			f.out.Logf("(%s) Timeout error, retry attempt %d", urlStr, attempt+1)
+		default:
+			return
+		}
+
+		backoffDuration := calculateBackoff(attempt)
+		time.Sleep(backoffDuration)
+	}
+
+	return
 }
 
 func (f *Fetcher) FetchWithIP(ctx context.Context, urlStr string, customIP string) (content []byte, code int, err error) {
@@ -47,16 +89,7 @@ func (f *Fetcher) FetchWithIP(ctx context.Context, urlStr string, customIP strin
 
 func (f *Fetcher) fetchCommon(ctx context.Context, urlStr string, customIP string) (content []byte, code int, err error) {
 	code = -1
-	parsedURL, err := url.Parse(urlStr)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	client := &http.Client{
-		Transport: f.createTransport(parsedURL, customIP),
-	}
-
-	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
+	req, err := retryablehttp.NewRequestWithContext(ctx, "GET", urlStr, nil)
 
 	if err != nil {
 		return nil, code, err
@@ -64,8 +97,7 @@ func (f *Fetcher) fetchCommon(ctx context.Context, urlStr string, customIP strin
 
 	req.Header.Set("User-Agent", f.userAgent)
 
-	resp, err := client.Do(req)
-
+	resp, err := f.client.Do(req)
 	if err != nil {
 		return nil, code, err
 	}
@@ -73,9 +105,8 @@ func (f *Fetcher) fetchCommon(ctx context.Context, urlStr string, customIP strin
 	defer resp.Body.Close()
 	code = resp.StatusCode
 
-	if resp.ContentLength > MaxLength {
-		return nil, code, errors.New("response too big")
-	}
+	// TODO maybe we should do download directly into a file?
+	//if resp.ContentLength > MaxLength {
 
 	content, err = io.ReadAll(resp.Body)
 
@@ -87,16 +118,22 @@ func (f *Fetcher) createTransport(parsedURL *url.URL, customIP string) *http.Tra
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: true,
 		},
+		// Add connection pooling and keep-alive settings
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 10,
+		IdleConnTimeout:     90 * time.Second,
+		// Disable keep-alive if you want to force new connections
+		// DisableKeepAlives:   true,
 	}
 
 	dialer := &net.Dialer{
-		Timeout: time.Duration(f.timeout * int(time.Second)),
+		Timeout:   time.Duration(f.timeout) * time.Second,
+		KeepAlive: 30 * time.Second, // Explicit keep-alive
 	}
 
 	transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
 		if customIP != "" {
 			host, port, err := net.SplitHostPort(addr)
-
 			f.out.Debugf("CreateTransport() - Before: %s Error: %v", addr, err)
 
 			if err != nil {
@@ -113,6 +150,41 @@ func (f *Fetcher) createTransport(parsedURL *url.URL, customIP string) *http.Tra
 	}
 
 	return transport
+}
+
+func (f *Fetcher) isErrNoHost(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "no route to host")
+}
+
+func (f *Fetcher) isConnectionError(err error) bool {
+	netErr, ok := err.(net.Error)
+
+	return ok && netErr.Temporary()
+}
+
+func (f *Fetcher) isTimeoutError(err error) bool {
+	netErr, ok := err.(net.Error)
+
+	return ok && netErr.Timeout()
+}
+
+func calculateBackoff(attempt int) time.Duration {
+	baseDelay := application.RetryAfterXSeconds * time.Second
+	maxDelay := 30 * time.Second
+
+	// Exponential backoff
+	delay := baseDelay * time.Duration(1<<uint(attempt))
+
+	// Add some randomness to prevent synchronized retries
+	jitter := time.Duration(rand.Intn(1000)) * time.Millisecond
+	delay += jitter
+
+	// Cap the maximum delay
+	if delay > maxDelay {
+		delay = maxDelay
+	}
+
+	return delay
 }
 
 func GetRandomUserAgent() string {

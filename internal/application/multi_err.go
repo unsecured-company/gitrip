@@ -1,5 +1,7 @@
 package application
 
+import "errors"
+
 type MultiErr struct {
 	Errs []error
 }
@@ -14,6 +16,14 @@ func (m *MultiErr) Dump(out *Output) {
 	for _, err := range m.Errs {
 		out.Log(err.Error())
 	}
+}
+
+func (m *MultiErr) Err() (err error) {
+	for _, errN := range m.Errs {
+		errors.Join(err, errN)
+	}
+
+	return
 }
 
 func (m *MultiErr) HasErrors() bool {

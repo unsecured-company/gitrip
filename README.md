@@ -34,8 +34,8 @@ This is intentional for easier cross-platform compatibility and reduce storage u
 - Detect and handle stale/slow downloads
 - Follow redirects and display the final URL
 - Identify if HTTP and HTTPS point to the same resource and use only one
-- Thoroughly test edge cases
-- Context
+- Context, signal catching
+- Tag parsing
 
 ## Acknowledgments
 - [Maxime Arthaud – git-dumper](https://github.com/arthaud/git-dumper)

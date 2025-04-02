@@ -7,11 +7,6 @@ import (
 	"unsecured.company/gitrip/internal/git"
 )
 
-/* TODO
-Two channels instead of SafeMapStrings
-Tag parsing
-*/
-
 var buildVersion = application.Version // Other default values are set in config.go
 
 type GitRip struct {

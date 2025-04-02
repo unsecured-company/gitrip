@@ -11,7 +11,7 @@ const doneMapSize = 1_000
 type FetchQueue struct {
 	mu      sync.Mutex
 	todo    chan string
-	done    map[string]bool // value is not used, for now.
+	done    map[string]bool // value itself is not used, for now.
 	cntTodo atomic.Uint32
 	cntDone atomic.Uint32
 }

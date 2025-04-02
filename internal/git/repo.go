@@ -7,6 +7,8 @@ import (
 	gourl "net/url"
 	"os"
 	"path/filepath"
+	"regexp"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -16,26 +18,28 @@ import (
 )
 
 const (
-	DirPerm                      = 0755
-	FilePerm                     = 0644
-	ObjectFilesCntWrongThreshold = 10
-	ProgressEvery                = time.Second * 2
+	DirPerm                  = 0755
+	FilePerm                 = 0644
+	ThresholdWrongObjectsPct = 50
+	ThresholdWrongObjectsCnt = 200
+	ProgressEveryXSec        = 2
 )
 
 type Repo struct {
-	dumper              *Dumper
-	cfg                 *application.Config
-	out                 *application.Output
-	Url                 *gourl.URL
-	Dir                 string
-	FilesQueue          *FetchQueue
-	wgFetcher           sync.WaitGroup
-	wgFetch             sync.WaitGroup
-	wgFileProcess       sync.WaitGroup
-	finished            atomic.Bool
-	objectFilesCnt      atomic.Uint32
-	objectFilesCntWrong int
-	objectFilesSkip     bool
+	dumper            *Dumper
+	cfg               *application.Config
+	out               *application.Output
+	Url               *gourl.URL
+	Dir               string
+	FilesQueue        *FetchQueue
+	wgFetcher         sync.WaitGroup
+	wgFetch           sync.WaitGroup
+	wgFileProcess     sync.WaitGroup
+	finished          atomic.Bool
+	objectFilesCntAll atomic.Uint32
+	objectFilesCntBad atomic.Uint32
+	objectFilesSkip   bool
+	regexpHash        *regexp.Regexp
 }
 
 func NewRepo(dumper *Dumper, urlP *gourl.URL) (rp *Repo) {
@@ -47,21 +51,13 @@ func NewRepo(dumper *Dumper, urlP *gourl.URL) (rp *Repo) {
 		out:        dumper.app.Out,
 		Url:        urlP,
 		FilesQueue: NewFetchQueue(),
+		regexpHash: regexp.MustCompile(HashRegexp),
 	}
 }
 
 func (rp *Repo) Run() (err error) {
-	rp.out.Logf("Running for url (%s)", rp.Url.String())
-
-	indexItem, err := rp.detect()
-	if err != nil {
-		return
-	}
-
-	exists, err := rp.createRootDir(rp.cfg.DwnDir, rp.Url)
-	if err == nil && exists && !rp.cfg.Update {
-		err = errors.New("directory exists and update is disabled")
-	}
+	rp.out.Logf("(%s) Starting", rp.Url.String())
+	indexItem, err := rp.detectAndStart()
 
 	if err != nil {
 		return
@@ -73,11 +69,15 @@ func (rp *Repo) Run() (err error) {
 		go rp.runnerFetch(i)
 	}
 
-	rp.addPaths(getPathsCommon())
-	countFromIndex, _ := rp.addReferencesFromIndex(indexItem)
-	rp.logf("%s files in GIT Index file", utils.NumToUnderscores(countFromIndex))
-
 	go rp.progressPrinter()
+	rp.addPaths(getPathsCommon())
+
+	paths, err := indexItem.getPathFromIndexFile()
+
+	if err == nil {
+		rp.addPaths(paths)
+		rp.logf("%s files in GIT Index file", utils.NumToUnderscores(len(paths)))
+	}
 
 	rp.out.Debugf("(%s) Waiting", rp.Url)
 	rp.Wait()
@@ -87,7 +87,7 @@ func (rp *Repo) Run() (err error) {
 	return
 }
 
-func (rp *Repo) createRootDir(dirBase string, url *gourl.URL) (exists bool, err error) {
+func (rp *Repo) setRootDir(dirBase string, url *gourl.URL) (exists bool, err error) {
 	var dir string
 	suffix := string(filepath.Separator) + PathRoot
 	dirUrl := strings.TrimRight(url.String(), string(filepath.Separator))
@@ -105,9 +105,7 @@ func (rp *Repo) createRootDir(dirBase string, url *gourl.URL) (exists bool, err 
 	dir = filepath.Join(dirBase, dirUrl, PathRoot)
 	_, err = os.Stat(dir)
 
-	if err != nil && os.IsNotExist(err) {
-		err = os.MkdirAll(dir, DirPerm)
-	} else {
+	if err == nil || !os.IsNotExist(err) {
 		exists = true
 	}
 
@@ -136,32 +134,33 @@ func (rp *Repo) runnerFetch(id int) {
 
 func (rp *Repo) fetchPath(path string) (it *Item, err error) {
 	rp.wgFetch.Add(1)
-	urlItem := utils.GetNewSuffixedUrl(rp.Url, path)
-	data, httpCode, err := rp.dumper.fetcher.Fetch(rp.dumper.app.Ctx, urlItem.String())
+	defer rp.wgFetch.Done()
 
-	it = NewItem(rp, path, true)
+	urlItem := utils.GetNewSuffixedUrl(rp.Url, path)
+	data, httpCode, err := rp.dumper.fetcher.Fetch(rp.dumper.app.Ctx, urlItem.String(), 4)
+	rp.FilesQueue.MarkDone(path)
+
+	if httpCode >= 300 {
+		return nil, fmt.Errorf("Non success code")
+	}
+
+	it = NewItem(rp.Dir, path, true, rp.out)
 	it.Update(data, httpCode, err)
-	rp.FilesQueue.MarkDone(it.fileName)
 
 	if it.exists {
 		rp.wgFileProcess.Add(1)
 		go rp.processFile(it)
 	}
 
-	rp.wgFetch.Done()
-
 	return
 }
 
 func (rp *Repo) processFile(item *Item) {
-	hashes, err := rp.getReferencesFromData(item)
-	rp.out.Debugf("(%s) references for [%s] (%d bytes): %v", rp.Url, item.fileName, item.fileSize, hashes)
+	paths, err := rp.getPathsFromData(item)
+	rp.addPaths(paths)
+	rp.out.Debugf("(%s)[%d] references for [%s] [%s] (%d bytes): %v", rp.Url, item.netHttpCode, item.fileName, item.objectType, item.fileSize, paths)
 
-	for _, hash := range hashes {
-		rp.addHashToFetcher(hash)
-	}
-
-	if err != nil {
+	if err != nil && !item.isObject {
 		rp.logf("[%s] error getting references: %v", item.fileName, err)
 	}
 
@@ -169,11 +168,19 @@ func (rp *Repo) processFile(item *Item) {
 	rp.wgFileProcess.Done()
 }
 
-func (rp *Repo) detect() (indexItem *Item, err error) {
-	hasIndex, indexItem, err := rp.hasIndexFile()
+func (rp *Repo) detectAndStart() (indexItem *Item, err error) {
+	exists, err := rp.setRootDir(rp.cfg.DwnDir, rp.Url)
+	if err == nil && exists && !rp.cfg.Update {
+		return indexItem, errors.New("directory exists and update is disabled")
+	}
 
+	hasIndex, indexItem, err := rp.hasIndexFile()
 	if !hasIndex {
 		err = errors.Join(errors.New("Not a valid GIT repository - .git/index file is missing or invalid."), err)
+	}
+
+	if err != nil {
+		return
 	}
 
 	rp.dumper.chanSave <- indexItem
@@ -182,55 +189,34 @@ func (rp *Repo) detect() (indexItem *Item, err error) {
 }
 
 func (rp *Repo) hasIndexFile() (hasIndex bool, indexItem *Item, err error) {
+	rp.out.Debugf("(%s) checking for index file", rp.Url)
 	urlItem := utils.GetNewSuffixedUrl(rp.Url, PathIndex)
-	data, httpCode, err := rp.dumper.fetcher.Fetch(rp.dumper.app.Ctx, urlItem.String())
+	data, httpCode, err := rp.dumper.fetcher.Fetch(rp.dumper.app.Ctx, urlItem.String(), 4)
+	rp.out.Debugf("(%s) check done, err: %v", rp.Url, err)
 
-	indexItem = NewItem(rp, PathIndex, true)
+	indexItem = NewItem(rp.Dir, PathIndex, true, rp.out)
 	indexItem.Update(data, httpCode, err)
 	hasIndex = indexItem.IsValidIndexFile()
 
 	return
 }
 
-func (rp *Repo) addPaths(paths []string) {
-	for _, path := range paths {
+func (rp *Repo) addPaths(paths map[string]bool) {
+	for path, _ := range paths {
 		rp.addPath(path)
 	}
 }
 
-func (rp *Repo) addHashToFetcher(hash string) {
-	name := rp.hashToPath(hash)
-
-	rp.addPath(name)
-}
-
-func (rp *Repo) getReferencesFromData(it *Item) (hashes []string, err error) {
+func (rp *Repo) getPathsFromData(it *Item) (paths map[string]bool, err error) {
 	if it.isObject && rp.objectFilesSkip {
 		return
 	}
 
-	if it.fileName == PathHead {
-		ref, isHash := it.getRefFromHead()
+	paths, err = it.GetPaths()
 
-		if isHash {
-			rp.addHashToFetcher(ref)
-		} else {
-			rp.addPath(ref)
-			rp.addPath("logs/" + ref)
-		}
-
-		return
-	}
-
-	hashes, err = it.GetReferences()
-
-	if err != nil {
-		rp.out.Logf("Error getting references for %s: %v", it.fileName, err)
-
-		if it.isObject {
-			rp.objectFilesCntWrong++
-			rp.checkObjectFileSkipping()
-		}
+	if err != nil && it.isObject {
+		rp.objectFilesCntBad.Add(1)
+		rp.checkObjectFileSkipping()
 	}
 
 	return
@@ -260,16 +246,12 @@ func (rp *Repo) addPath(path string) {
 	rp.FilesQueue.Add(path)
 
 	if isObjectFile(path) {
-		rp.objectFilesCnt.Add(1)
+		rp.objectFilesCntAll.Add(1)
 	}
 }
 
 func (rp *Repo) findHashes(data []byte) (hashes []string) {
 	return rp.dumper.hashRegexp.FindAllString(string(data), -1)
-}
-
-func (rp *Repo) hashToPath(hash string) (path string) {
-	return fmt.Sprintf("objects/%s/%s", hash[:2], hash[2:])
 }
 
 func (rp *Repo) hasItemChanCountBetween(xan chan *Item, defaultSize int) bool {
@@ -278,29 +260,16 @@ func (rp *Repo) hasItemChanCountBetween(xan chan *Item, defaultSize int) bool {
 	return cnt > 0 && cnt < defaultSize
 }
 
-func (rp *Repo) addReferencesFromIndex(it *Item) (count int, err error) {
-	fr := bytes.NewReader(it.fileData)
-	index, err := NewIndexFromReader(fr)
-
-	if err != nil {
-		rp.out.Logf("Can not read index file: %v", err)
-
-		return
-	}
-
-	for _, e := range index.Index.Entries {
-		//rp.out.Debugf("adding hash from index %s", e.Hash.String()) // TODO
-		rp.addHashToFetcher(e.Hash.String())
-		count++
-	}
-
-	return
-}
-
 func (rp *Repo) progressPrinter() {
 	for !rp.finished.Load() {
-		rp.logf("queued/done, %d/%d", rp.FilesQueue.CntQueued(), rp.FilesQueue.CntDone())
-		time.Sleep(ProgressEvery)
+		var m runtime.MemStats
+		runtime.ReadMemStats(&m)
+
+		msgMem := "Mem MB allocated/total/system/garbage %v/%v/%v/%v"
+		msgMem = fmt.Sprintf(msgMem, m.Alloc/1024/1024, m.TotalAlloc/1024/1024, m.Sys/1024/1024, m.NumGC)
+
+		rp.logf("queued/done, %d/%d [%d] %s", rp.FilesQueue.CntQueued(), rp.FilesQueue.CntDone(), len(rp.FilesQueue.todo), msgMem)
+		time.Sleep(ProgressEveryXSec * time.Second)
 	}
 }
 
@@ -309,9 +278,13 @@ func (rp *Repo) checkObjectFileSkipping() {
 		return
 	}
 
-	if rp.objectFilesCntWrong >= ObjectFilesCntWrongThreshold && (int(rp.objectFilesCnt.Load())/10) < rp.objectFilesCntWrong {
-		rp.out.Log(rp.logMsg("Skipping /object/ files as lot of them are bad"))
+	cntAll := rp.objectFilesCntAll.Load()
+	cntBad := rp.objectFilesCntBad.Load()
+	isOverAbsoluteLimit := cntBad >= ThresholdWrongObjectsCnt
+	isOverPercentage := cntBad*100 > cntAll*ThresholdWrongObjectsPct
 
+	if isOverAbsoluteLimit && isOverPercentage {
+		rp.logf("Skipping object files, %d/%d wrong", cntBad, cntAll)
 		rp.objectFilesSkip = true
 	}
 }

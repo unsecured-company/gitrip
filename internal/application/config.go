@@ -3,13 +3,25 @@ package application
 import "fmt"
 
 const (
-	Version               = "1.0.0-250322"
+	Version               = "1.1.0-250402"
 	DefaultFetchDir       = "dumps"
 	DefaultFetchWorkers   = 4
 	DefaultTimeout        = 10
 	DefaultCntDownThreads = 10
-	LimitHashes           = 1000 // Max hashes to read by regex from files other than /objects.
+	LimitHashes           = 2000 // Max hashes to read by regex from files other than /objects.
 	DebugPrintEveryFetch  = false
+	RetryAfterXSeconds    = 5
+
+	FetchClientRetryMax           = 4
+	FetchClientRetryWaitMinSec    = 1
+	FetchClientRetryWaitMaxSec    = 30
+	FetchClientMaxIdleCnt         = 100
+	FetchClientMaxConnPerHost     = 10
+	FetchClientIdleConnTimeoutSec = 90
+
+	// SkipExisting TODO check what we downloaded, and skip these. Will work for /objects, as they are verified by their hash name
+	SkipExisting                = true
+	IgnoreInvalidObjectChecksum = true
 )
 
 const (
@@ -45,6 +57,8 @@ func NewConfig(args []string, out *Output) (cfg *Config, mErr *MultiErr) {
 	if mErr.HasErrors() {
 		return
 	}
+
+	// TODO validate url
 
 	cfg.DwnThreads = DefaultFetchWorkers
 	out.SetVerbose(cfg.Verbose)
