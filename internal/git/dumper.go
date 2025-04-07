@@ -4,14 +4,14 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"github.com/unsecured-company/gitrip/internal/application"
+	"github.com/unsecured-company/gitrip/internal/network"
+	"github.com/unsecured-company/gitrip/internal/utils"
 	"math"
-	gourl "net/url"
+	"net/url"
 	"os"
 	"regexp"
 	"sync"
-	"unsecured.company/gitrip/internal/application"
-	"unsecured.company/gitrip/internal/network"
-	"unsecured.company/gitrip/internal/utils"
 )
 
 const (
@@ -196,8 +196,8 @@ func Percentage(value, total int) string {
 	return fmt.Sprintf("%d%%", int(percent))
 }
 
-func (d *Dumper) parseLine(line string) (urlP *gourl.URL, err error) {
-	urlP, err = gourl.Parse(line)
+func (d *Dumper) parseLine(line string) (urlP *url.URL, err error) {
+	urlP, err = url.Parse(line)
 
 	if err != nil {
 		return
@@ -206,7 +206,7 @@ func (d *Dumper) parseLine(line string) (urlP *gourl.URL, err error) {
 	if urlP.Scheme == "" {
 		urlP.Scheme = "https"
 		line = urlP.String()
-		urlP, err = gourl.Parse(line)
+		urlP, err = url.Parse(line)
 	}
 
 	return

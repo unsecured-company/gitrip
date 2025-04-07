@@ -1,4 +1,4 @@
-module unsecured.company/gitrip
+module github.com/unsecured-company/gitrip
 
 go 1.23.0
 

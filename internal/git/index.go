@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/go-git/go-git/v5/plumbing/format/index"
+	"github.com/unsecured-company/gitrip/internal/application"
+	"github.com/unsecured-company/gitrip/internal/utils"
 	"io"
 	"os"
-	"unsecured.company/gitrip/internal/application"
-	"unsecured.company/gitrip/internal/utils"
 )
 
 type Index struct {

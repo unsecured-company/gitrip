@@ -3,22 +3,22 @@ package fs
 import (
 	"bufio"
 	"fmt"
-	gourl "net/url"
+	"github.com/unsecured-company/gitrip/internal/application"
+	"github.com/unsecured-company/gitrip/internal/utils"
+	"net/url"
 	"os"
-	"unsecured.company/gitrip/internal/application"
-	"unsecured.company/gitrip/internal/utils"
 )
 
 type Batch struct {
 	app                   *application.App
 	file                  string
-	UrlChan               chan *gourl.URL
+	UrlChan               chan *url.URL
 	CntValidWithScheme    int
 	CntValidWithoutScheme int
 	CntInvalid            int
 }
 
-func NewBatch(app *application.App, file string, urlChan chan *gourl.URL) *Batch {
+func NewBatch(app *application.App, file string, urlChan chan *url.URL) *Batch {
 	bat := Batch{
 		app:     app,
 		file:    file,

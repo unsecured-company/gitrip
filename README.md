@@ -4,7 +4,11 @@ Testing and feedback are welcome, feel free to
 [open an issue](https://github.com/unsecured-company/gitrip/issues).
 
 ## Installation
-Repository contains Makefile which build for all main platforms and architectures.
+```
+go install github.com/unsecured-company/gitrip@latest
+```
+
+The repository also contains a Makefile that builds for all major platforms and architectures.
 
 ## Usage
 ```

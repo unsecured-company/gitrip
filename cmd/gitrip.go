@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
+	"github.com/unsecured-company/gitrip/internal/application"
+	"github.com/unsecured-company/gitrip/internal/git"
 	"os"
-	"unsecured.company/gitrip/internal/application"
-	"unsecured.company/gitrip/internal/git"
 )
 
 var buildVersion = application.Version // Other default values are set in config.go

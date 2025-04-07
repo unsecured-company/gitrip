@@ -3,7 +3,7 @@ package application
 import "fmt"
 
 const (
-	Version               = "1.1.0-250402"
+	Version               = "1.1.1-250407"
 	DefaultFetchDir       = "dumps"
 	DefaultFetchWorkers   = 4
 	DefaultTimeout        = 10

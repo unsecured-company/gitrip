@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	gourl "net/url"
+	"github.com/unsecured-company/gitrip/internal/application"
+	"github.com/unsecured-company/gitrip/internal/utils"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -13,8 +15,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-	"unsecured.company/gitrip/internal/application"
-	"unsecured.company/gitrip/internal/utils"
 )
 
 const (
@@ -29,7 +29,7 @@ type Repo struct {
 	dumper            *Dumper
 	cfg               *application.Config
 	out               *application.Output
-	Url               *gourl.URL
+	Url               *url.URL
 	Dir               string
 	FilesQueue        *FetchQueue
 	wgFetcher         sync.WaitGroup
@@ -42,7 +42,7 @@ type Repo struct {
 	regexpHash        *regexp.Regexp
 }
 
-func NewRepo(dumper *Dumper, urlP *gourl.URL) (rp *Repo) {
+func NewRepo(dumper *Dumper, urlP *url.URL) (rp *Repo) {
 	utils.AddUrlSuffix(urlP, PathRoot)
 
 	return &Repo{
@@ -87,10 +87,10 @@ func (rp *Repo) Run() (err error) {
 	return
 }
 
-func (rp *Repo) setRootDir(dirBase string, url *gourl.URL) (exists bool, err error) {
+func (rp *Repo) setRootDir(dirBase string, urlP *url.URL) (exists bool, err error) {
 	var dir string
 	suffix := string(filepath.Separator) + PathRoot
-	dirUrl := strings.TrimRight(url.String(), string(filepath.Separator))
+	dirUrl := strings.TrimRight(urlP.String(), string(filepath.Separator))
 
 	if strings.HasSuffix(dirUrl, suffix) {
 		dirUrl = strings.TrimSuffix(dirUrl, suffix)
