@@ -6,8 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/unsecured-company/gitrip/internal/application"
-	"github.com/unsecured-company/gitrip/internal/utils"
 	"io"
 	"net/http"
 	"os"
@@ -15,6 +13,9 @@ import (
 	"regexp"
 	"strings"
 	"unsafe"
+
+	"github.com/unsecured-company/gitrip/internal/application"
+	"github.com/unsecured-company/gitrip/internal/utils"
 )
 
 // TODO Better check for Exists

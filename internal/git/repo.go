@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/unsecured-company/gitrip/internal/application"
-	"github.com/unsecured-company/gitrip/internal/utils"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -15,6 +13,9 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/unsecured-company/gitrip/internal/application"
+	"github.com/unsecured-company/gitrip/internal/utils"
 )
 
 const (

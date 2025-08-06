@@ -4,14 +4,15 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"github.com/unsecured-company/gitrip/internal/application"
-	"github.com/unsecured-company/gitrip/internal/network"
-	"github.com/unsecured-company/gitrip/internal/utils"
 	"math"
 	"net/url"
 	"os"
 	"regexp"
 	"sync"
+
+	"github.com/unsecured-company/gitrip/internal/application"
+	"github.com/unsecured-company/gitrip/internal/network"
+	"github.com/unsecured-company/gitrip/internal/utils"
 )
 
 const (

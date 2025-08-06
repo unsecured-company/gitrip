@@ -3,10 +3,11 @@ package fs
 import (
 	"bufio"
 	"fmt"
-	"github.com/unsecured-company/gitrip/internal/application"
-	"github.com/unsecured-company/gitrip/internal/utils"
 	"net/url"
 	"os"
+
+	"github.com/unsecured-company/gitrip/internal/application"
+	"github.com/unsecured-company/gitrip/internal/utils"
 )
 
 type Batch struct {

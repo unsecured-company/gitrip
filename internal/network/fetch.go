@@ -3,8 +3,6 @@ package network
 import (
 	"context"
 	"crypto/tls"
-	"github.com/hashicorp/go-retryablehttp"
-	"github.com/unsecured-company/gitrip/internal/application"
 	"io"
 	"math/rand"
 	"net"
@@ -12,6 +10,9 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/hashicorp/go-retryablehttp"
+	"github.com/unsecured-company/gitrip/internal/application"
 )
 
 type Fetcher struct {

@@ -2,12 +2,13 @@ package git
 
 import (
 	"fmt"
+	"net/url"
+	"sync"
+
 	"github.com/unsecured-company/gitrip/internal/application"
 	"github.com/unsecured-company/gitrip/internal/fs"
 	"github.com/unsecured-company/gitrip/internal/network"
 	"github.com/unsecured-company/gitrip/internal/utils"
-	"net/url"
-	"sync"
 )
 
 const UrlsChanSize = 1000
