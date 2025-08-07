@@ -92,6 +92,7 @@ func getConfigIndex(cfg *Config) *cobra.Command {
 	indexCmd.Flags().BoolVarP(&cfg.Verbose, "verbose", "v", false, "Enable verbose mode")
 	indexCmd.Flags().BoolVar(&cfg.Tree, "tree", false, "Show as tree")
 	indexCmd.Flags().BoolVar(&cfg.Raw, "raw", false, "Show as raw data")
+	indexCmd.Flags().BoolVar(&cfg.Csv, FlagCsv, false, "Show as CSV")
 
 	return indexCmd
 }

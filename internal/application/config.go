@@ -3,7 +3,7 @@ package application
 import "fmt"
 
 const (
-	Version               = "1.1.2-250407"
+	Version               = "1.1.3-250807"
 	DefaultFetchDir       = "dumps"
 	DefaultFetchWorkers   = 4
 	DefaultTimeout        = 10
@@ -31,6 +31,7 @@ const (
 	CmdHelp  = "help"
 	FlagFile = "file"
 	FlagUrl  = "url"
+	FlagCsv  = "csv"
 )
 
 type Config struct {
@@ -41,8 +42,9 @@ type Config struct {
 	IndexFile  string
 	OutputDir  string
 	Raw        bool
-	Timeout    int
+	Csv        bool
 	Tree       bool
+	Timeout    int
 	URL        string
 	Update     bool
 	UserAgent  string
