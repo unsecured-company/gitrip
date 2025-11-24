@@ -3,7 +3,7 @@ package application
 import "fmt"
 
 const (
-	Version               = "1.1.3-250807"
+	Version               = "1.1.4-251124"
 	DefaultFetchDir       = "dumps"
 	DefaultFetchWorkers   = 4
 	DefaultTimeout        = 10
@@ -12,7 +12,7 @@ const (
 	DebugPrintEveryFetch  = false
 	RetryAfterXSeconds    = 5
 
-	FetchClientRetryMax           = 4
+	DefaultFetchClientRetryMax    = 4
 	FetchClientRetryWaitMinSec    = 1
 	FetchClientRetryWaitMaxSec    = 30
 	FetchClientMaxIdleCnt         = 100
@@ -25,13 +25,15 @@ const (
 )
 
 const (
-	CmdCheck = "check"
-	CmdFetch = "fetch"
-	CmdIndex = "index"
-	CmdHelp  = "help"
-	FlagFile = "file"
-	FlagUrl  = "url"
-	FlagCsv  = "csv"
+	CmdCheck    = "check"
+	CmdFetch    = "fetch"
+	CmdIndex    = "index"
+	CmdHelp     = "help"
+	FlagFile    = "file"
+	FlagTimeout = "timeout"
+	FlagRetry   = "retry"
+	FlagUrl     = "url"
+	FlagCsv     = "csv"
 )
 
 type Config struct {
@@ -45,6 +47,7 @@ type Config struct {
 	Csv        bool
 	Tree       bool
 	Timeout    int
+	Retry      int
 	URL        string
 	Update     bool
 	UserAgent  string

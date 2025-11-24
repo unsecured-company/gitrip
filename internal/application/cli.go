@@ -100,7 +100,8 @@ func getConfigIndex(cfg *Config) *cobra.Command {
 func addFetchFlags(cfg *Config, cmd *cobra.Command) {
 	cmd.Flags().BoolVarP(&cfg.Verbose, "verbose", "v", false, "Enable verbose mode")
 	cmd.Flags().StringVar(&cfg.BatchFile, FlagFile, "", "Batch file with URLs")
-	cmd.Flags().IntVar(&cfg.Timeout, "timeout", DefaultTimeout, "Network timeout in seconds")
+	cmd.Flags().IntVar(&cfg.Timeout, FlagTimeout, DefaultTimeout, "Network timeout in seconds")
+	cmd.Flags().IntVar(&cfg.Retry, FlagRetry, DefaultFetchClientRetryMax, "Retry X times")
 }
 
 func checkForUrlAndFile(cfg *Config) (err error) {

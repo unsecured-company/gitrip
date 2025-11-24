@@ -24,7 +24,7 @@ type Fetcher struct {
 
 func NewFetcher(app *application.App) (fetcher *Fetcher) {
 	retryClient := retryablehttp.NewClient()
-	retryClient.RetryMax = application.FetchClientRetryMax
+	retryClient.RetryMax = app.Cfg.Retry
 	retryClient.RetryWaitMin = application.FetchClientRetryWaitMinSec * time.Second
 	retryClient.RetryWaitMax = application.FetchClientRetryWaitMaxSec * time.Second
 	retryClient.CheckRetry = retryablehttp.DefaultRetryPolicy
